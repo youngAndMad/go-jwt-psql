@@ -1,10 +1,11 @@
 package models
 
 import (
+	"errors"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
-	"html"
-	"strings"
+	"jwt-psql/utils/token"
+	"log"
 )
 
 type User struct {
@@ -24,15 +25,61 @@ func (u *User) SaveUser() (*User, error) {
 	return u, nil
 }
 
-func (u *User) BeforeSave() error {
-
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
+func GetUserByID(id uint) (*User, error) {
+	var u User
+	err := db.First(&u, id).Error
 	if err != nil {
-		return err
+		return &User{}, err
 	}
 
-	u.Password = string(hashedPassword)
-	u.Username = html.EscapeString(strings.TrimSpace(u.Username))
+	u.Password = ""
+	return &u, nil
+}
 
-	return nil
+func LoginAndGenerateToken(username, password string) (string, error) {
+	var err error
+
+	u := User{}
+
+	err = db.Model(u).Where("username = ?", username).Take(&u).Error
+
+	if err != nil {
+		return "", err
+	}
+
+	err = VerifyPassword(password, u.Password)
+
+	if err != nil && errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+		return "", err
+	}
+
+	generateToken, err := token.GenerateToken(u.ID)
+
+	if err != nil {
+		return "", err
+	}
+
+	return generateToken, nil
+}
+
+func VerifyPassword(password, hashedPassword string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+}
+
+func UserExistsByUsername(username string) (bool, error) {
+	var exists bool
+	var model User
+
+	err := db.Model(model).
+		Select("count(*) > 0").
+		Where("username = ?", username).
+		Find(&exists).
+		Error
+
+	if err != nil {
+		log.Println(err)
+		return false, err
+	}
+
+	return exists, err
 }

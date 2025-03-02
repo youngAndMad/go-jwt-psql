@@ -27,13 +27,12 @@ func Init() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	} else {
 		log.Println("Connected to database")
-		defer dbConn.Close()
 	}
 	db, err = gorm.Open(postgres.New(postgres.Config{Conn: dbConn}), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	err = db.AutoMigrate(&User{})
+	//err = db.AutoMigrate(&User{})
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 		return
